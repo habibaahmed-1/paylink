@@ -1,7 +1,7 @@
 # PayLink — Phase 1 AI Prompt Log
 
 **Project:** PayLink Digital Wallet & Bill-Payment Backend  
-**Lab Section:** S5,6  
+**Lab Section:** S5,6.
 **Team Members:** Habiba Ahmed Hamed (20240157), Roaa Hany Mostafa (20240204), Jana Ahmed Farid (20242084), Rahma Ahmed Samy (20242121)
 
 | Date | Author | Stage | Tool and model | Prompt | Summary of answer | Verdict (accepted, fixed, rejected) and why |
