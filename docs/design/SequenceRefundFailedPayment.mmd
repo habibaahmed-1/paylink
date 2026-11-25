@@ -1,0 +1,41 @@
+sequenceDiagram
+    autonumber
+
+    participant PayLink
+    participant Payment
+    participant Wallet as Wallet and Ledger
+    participant Audit as Audit Log
+
+    PayLink->>Payment: Request refund for payment reference
+    Payment->>Payment: Check current state
+
+    alt Payment is already Refunded
+        Payment-->>PayLink: Return Refunded without another release
+
+    else Payment is Failed
+        Payment->>Wallet: Check held total for this payment
+
+        alt Matching hold exists
+            Wallet-->>Payment: Confirm held total and funding wallet
+
+            critical Release funds and mark Refunded atomically and exactly once
+                Payment->>Wallet: Release held total to funding wallet
+                Wallet->>Wallet: Record immutable ledger entry
+                Wallet->>Audit: Record release amount, wallet, payment, initiator, time and reason
+                Wallet-->>Payment: Release recorded
+                Payment->>Payment: Set Refunded
+            end
+
+            Payment-->>PayLink: Return Refunded
+
+        else Matching hold cannot be confirmed
+            Wallet-->>Payment: Report hold inconsistency
+            Payment-->>PayLink: Keep Failed and report refund failure
+        end
+
+    else Payment is in another state
+        Payment-->>PayLink: Refuse refund without changing state or balances
+    end
+
+    Note over Payment,Wallet: Release the bill amount plus service fee to the original funding wallet.
+    Note over Payment,Wallet: Unknown payments must be confirmed Failed before a refund.

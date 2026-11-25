@@ -1,0 +1,180 @@
+flowchart LR
+
+    %% ================= ACTORS =================
+    Customer["Customer"]
+    Agent["Agent"]
+    Support["Support Employee"]
+    Admin["Admin"]
+    ExternalBiller(["External Biller APIs"])
+    NotificationProvider(["SMS / Email / Push Providers"])
+
+    %% ================= SYSTEM =================
+    subgraph PayLink["PayLink System"]
+        direction TB
+
+        %% 1. ACCOUNTS
+        subgraph Accounts["1. Authentication and Accounts"]
+            UC1(["Register Account - FR-1"])
+            UC2(["Upgrade to Verified - FR-2"])
+            UC3(["Login - Supporting Flow"])
+        end
+
+        %% 2. WALLET AND LEDGER
+        subgraph Wallet["2. Wallet and Immutable Ledger"]
+            UC4(["Top Up Wallet - FR-4"])
+            UC5(["View Available and Held Balance - FR-3"])
+            UC6(["View Transaction History - FR-3"])
+            UC7(["Record Ledger Entries and Calculate Balances - FR-5"])
+            UC8(["Hold, Settle and Release Funds - FR-12"])
+        end
+
+        %% 3. BILLER CATALOG AND FEES
+        subgraph Catalog["3. Biller Catalog and Fees"]
+            UC9(["Manage Billers and Services - FR-6"])
+            UC10(["Browse Billers and Required Input Fields - FR-7"])
+            UC11(["Inquire Bill Details and Display Amount - FR-8"])
+            UC12(["Calculate Service Fees, Total and Promotions - FR-16"])
+            UC13(["Configure Fee and Limit Values - FR-24"])
+        end
+
+        %% 4. PAYMENTS
+        subgraph Payments["4. Core Payments and Integration"]
+            UC14(["Pay Bill from Customer Wallet - FR-9"])
+            UC15(["Pay on Behalf of Customer - FR-17"])
+            UC16(["Validate Minimum, Maximum and Daily Payment Limits - FR-18"])
+            UC17(["Apply Velocity Rule and Temporary Account Block - FR-19"])
+            UC18(["Enforce Idempotency - FR-10"])
+            UC19(["Enforce Payment Lifecycle - FR-11"])
+            UC20(["Handle Timeout and Retry Unknown Payments - FR-13"])
+            UC21(["Process Asynchronous Callbacks and Ignore Duplicates - FR-14"])
+            UC22(["Integrate ElectroCo, AquaCo and TopUpNet - FR-15"])
+            UC23(["Credit Agent Commission on Completion - FR-17"])
+            UC32(["Validate Account Block Status - Fraud Check"])
+        end
+
+        %% 5. SUPPORT AND RECONCILIATION
+        subgraph SupportModule["5. Support and Reconciliation"]
+            UC24(["Search Payment by Reference and View Full History - FR-20"])
+            UC25(["Block and Unblock Customer Account - FR-21"])
+            UC26(["Request Refund of Completed Payment - FR-27"])
+            UC33(["Review and Approve Refund Request - FR-27"])
+            UC27(["Generate Daily Reconciliation Report from Settlement File - FR-26"])
+        end
+
+        %% 6. NOTIFICATIONS AND ADMIN REPORTING
+        subgraph AdminModule["6. Notifications, Audit and Reporting"]
+            UC28(["Send SMS and Push on Payment Completion or Failure - FR-22"])
+            UC29(["Retry Failed Notifications up to 3 Times and Mark Undelivered - FR-23"])
+            UC30(["Record Money Movements and Admin Actions in Audit Log - FR-25"])
+            UC31(["View Daily Payment, Fee, Commission and Failure Totals - FR-28"])
+        end
+    end
+
+    %% ================= CUSTOMER =================
+    Customer --> UC1
+    Customer --> UC2
+    Customer --> UC3
+    Customer --> UC4
+    Customer --> UC5
+    Customer --> UC6
+    Customer --> UC10
+    Customer --> UC11
+    Customer --> UC14
+    Customer --> UC26
+
+    %% ================= AGENT =================
+    Agent --> UC3
+    Agent --> UC4
+    Agent --> UC5
+    Agent --> UC6
+    Agent --> UC10
+    Agent --> UC11
+    Agent --> UC15
+
+    %% ================= SUPPORT =================
+    Support --> UC3
+    Support --> UC24
+    Support --> UC25
+    Support --> UC33
+    Support --> UC27
+
+    %% ================= ADMIN =================
+    Admin --> UC3
+    Admin --> UC9
+    Admin --> UC13
+    Admin --> UC31
+
+    %% ================= EXTERNAL SYSTEMS =================
+    UC11 --> ExternalBiller
+    UC14 --> ExternalBiller
+    UC15 --> ExternalBiller
+    UC20 --> ExternalBiller
+    UC22 --> ExternalBiller
+
+    ExternalBiller --> UC21
+    ExternalBiller --> UC27
+
+    UC28 --> NotificationProvider
+    UC29 --> NotificationProvider
+
+    %% ================= INCLUDE RELATIONSHIPS =================
+
+    %% Bill inquiry and fee calculation
+    UC11 -.->|"&laquo;include&raquo;"| UC12
+
+    %% Customer payment processing
+    UC14 -.->|"&laquo;include&raquo;"| UC11
+    UC14 -.->|"&laquo;include&raquo;"| UC12
+    UC14 -.->|"&laquo;include&raquo;"| UC16
+    UC14 -.->|"&laquo;include&raquo;"| UC17
+    UC14 -.->|"&laquo;include&raquo;"| UC18
+    UC14 -.->|"&laquo;include&raquo;"| UC19
+    UC14 -.->|"&laquo;include&raquo;"| UC8
+    UC14 -.->|"&laquo;include&raquo;"| UC22
+    UC14 -.->|"&laquo;include&raquo;"| UC32
+
+    %% Agent payment processing
+    UC15 -.->|"&laquo;include&raquo;"| UC11
+    UC15 -.->|"&laquo;include&raquo;"| UC12
+    UC15 -.->|"&laquo;include&raquo;"| UC16
+    UC15 -.->|"&laquo;include&raquo;"| UC17
+    UC15 -.->|"&laquo;include&raquo;"| UC18
+    UC15 -.->|"&laquo;include&raquo;"| UC19
+    UC15 -.->|"&laquo;include&raquo;"| UC8
+    UC15 -.->|"&laquo;include&raquo;"| UC22
+    UC15 -.->|"&laquo;include&raquo;"| UC23
+    UC15 -.->|"&laquo;include&raquo;"| UC32
+
+    %% Ledger records
+    UC4 -.->|"&laquo;include&raquo;"| UC7
+    UC8 -.->|"&laquo;include&raquo;"| UC7
+    UC23 -.->|"&laquo;include&raquo;"| UC7
+    UC33 -.->|"&laquo;include&raquo;"| UC7
+
+    %% Notifications on final payment result
+    UC14 -.->|"&laquo;include&raquo;"| UC28
+    UC15 -.->|"&laquo;include&raquo;"| UC28
+
+    %% Audit logging
+    UC4 -.->|"&laquo;include&raquo;"| UC30
+    UC8 -.->|"&laquo;include&raquo;"| UC30
+    UC14 -.->|"&laquo;include&raquo;"| UC30
+    UC15 -.->|"&laquo;include&raquo;"| UC30
+    UC23 -.->|"&laquo;include&raquo;"| UC30
+    UC25 -.->|"&laquo;include&raquo;"| UC30
+    UC33 -.->|"&laquo;include&raquo;"| UC30
+    UC9 -.->|"&laquo;include&raquo;"| UC30
+    UC13 -.->|"&laquo;include&raquo;"| UC30
+
+    %% ================= EXTEND RELATIONSHIPS =================
+    UC29 -.->|"&laquo;extend&raquo;"| UC28
+
+    %% ================= STYLING =================
+    classDef actor fill:#E8F1FF,stroke:#2563EB,color:#1E3A8A
+    classDef usecase fill:#F8FAFC,stroke:#64748B,color:#0F172A
+    classDef external fill:#FFF7ED,stroke:#EA580C,color:#9A3412
+
+    class Customer,Agent,Support,Admin actor
+    class ExternalBiller,NotificationProvider external
+
+    class UC1,UC2,UC3,UC4,UC5,UC6,UC7,UC8,UC9,UC10,UC11,UC12,UC13,UC14,UC15,UC16,UC17,UC18,UC19,UC20,UC21,UC22,UC23,UC24,UC25,UC26,UC27,UC28,UC29,UC30,UC31,UC32,UC33 usecase

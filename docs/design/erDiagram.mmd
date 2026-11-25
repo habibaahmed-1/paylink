@@ -1,0 +1,345 @@
+erDiagram
+    direction TB
+
+    %% ================= USERS AND ACCOUNTS =================
+
+    USERS {
+        uuid user_id PK
+        varchar full_name
+        varchar phone_number UK
+        varchar email UK
+        varchar password_hash
+        varchar role "CUSTOMER | AGENT | SUPPORT | ADMIN"
+        varchar tier "BASIC | VERIFIED"
+        varchar status "ACTIVE | SUSPENDED"
+        timestamp created_at
+    }
+
+    ACCOUNT_BLOCKS {
+        uuid block_id PK
+        uuid user_id FK
+        varchar block_type "MANUAL | VELOCITY"
+        text reason
+        timestamp started_at
+        timestamp expires_at "Nullable"
+        timestamp lifted_at "Nullable"
+        uuid created_by_user_id FK "Nullable"
+        uuid lifted_by_user_id FK "Nullable"
+    }
+
+    %% ================= WALLET AND LEDGER =================
+
+    WALLETS {
+        uuid wallet_id PK
+        uuid user_id FK, UK "Nullable (NULL for PAYLINK wallet; 1:1 for CUSTOMER/AGENT; none for SUPPORT/ADMIN)"
+        varchar wallet_type "CUSTOMER | AGENT | PAYLINK"
+        varchar currency "EGP"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    LEDGER_ENTRIES {
+        uuid entry_id PK
+        uuid wallet_id FK
+        uuid payment_id FK "Nullable"
+        uuid top_up_id FK "Nullable"
+        uuid refund_id FK "Nullable"
+        varchar entry_type "TOP_UP | HOLD | SETTLE | RELEASE | FEE_REVENUE | COMMISSION_DEBIT | COMMISSION_CREDIT | REFUND_CREDIT"
+        decimal amount
+        decimal available_balance_change
+        decimal held_balance_change
+        text description
+        timestamp created_at
+    }
+
+    TOP_UP_TRANSACTIONS {
+        uuid top_up_id PK
+        uuid wallet_id FK
+        uuid initiated_by_user_id FK
+        varchar method "SIMULATED_CARD | AGENT_CASH"
+        decimal amount
+        varchar external_reference UK
+        varchar status "COMPLETED | FAILED"
+        timestamp created_at
+    }
+
+    %% ================= BILLER CATALOG =================
+
+    BILLERS {
+        uuid biller_id PK
+        varchar code UK
+        varchar name
+        boolean is_active
+        varchar protocol "REST_JSON | SOAP_XML | BATCH_CSV"
+        varchar response_mode "IMMEDIATE | ASYNCHRONOUS | BATCH"
+        boolean supports_async_callback
+        int timeout_seconds
+        int callback_deadline_minutes "Team decision"
+        jsonb integration_config
+    }
+
+    SERVICES {
+        uuid service_id PK
+        uuid biller_id FK
+        varchar name
+        varchar category
+        boolean is_active
+        jsonb required_input_schema
+        decimal min_amount
+        decimal max_amount
+    }
+
+    %% ================= FEES AND PROMOTIONS =================
+
+    FEE_RULES {
+        uuid fee_rule_id PK
+        uuid service_id FK
+        varchar fee_type "FIXED | PERCENTAGE | TIERED"
+        decimal fee_value
+        decimal minimum_fee
+        decimal lower_threshold "Nullable"
+        decimal upper_threshold "Nullable"
+        timestamp effective_from
+        timestamp effective_to "Nullable"
+        boolean is_active
+    }
+
+    PROMOTIONS {
+        uuid promotion_id PK
+        uuid biller_id FK
+        uuid service_id FK "Nullable"
+        varchar discount_type "FIXED | PERCENTAGE"
+        decimal discount_value
+        timestamp start_date
+        timestamp end_date
+        boolean is_active
+    }
+
+    %% ================= PAYMENTS =================
+
+    PAYMENTS {
+        uuid payment_id PK
+        varchar payment_reference UK
+        varchar idempotency_key "Composite unique with funding_wallet_id"
+        varchar request_hash
+        uuid customer_user_id FK "Nullable (NULL for walk-in guest)"
+        varchar customer_phone_number "Nullable (Guest SMS receipt)"
+        uuid initiated_by_user_id FK
+        uuid agent_user_id FK "Nullable"
+        uuid funding_wallet_id FK
+        uuid biller_id FK
+        uuid service_id FK
+        varchar biller_account_ref
+        decimal bill_amount
+        decimal service_fee
+        decimal total_amount
+        decimal agent_commission
+        varchar state "INITIATED | FUNDS_HELD | SENT_TO_BILLER | COMPLETED | FAILED | UNKNOWN | REJECTED | REFUNDED"
+        text failure_reason "Nullable"
+        int retry_count
+        timestamp next_retry_at "Nullable"
+        timestamp callback_deadline "Nullable"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    PAYMENT_STATE_HISTORY {
+        uuid history_id PK
+        uuid payment_id FK
+        varchar previous_state "Nullable"
+        varchar new_state
+        text reason
+        timestamp changed_at
+    }
+
+    BILLER_INTERACTIONS {
+        uuid interaction_id PK
+        uuid payment_id FK
+        int attempt_number
+        varchar request_reference 
+        varchar response_code "Nullable"
+        text response_message "Nullable"
+        varchar external_reference "Nullable"
+        timestamp sent_at
+        timestamp responded_at "Nullable"
+        varchar outcome "SUCCESS | FAILURE | TIMEOUT | ACCEPTED | UNKNOWN"
+    }
+
+    BILLER_CALLBACKS {
+        uuid callback_id PK
+        uuid payment_id FK "Nullable for unmatched callbacks"
+        varchar payment_reference
+        varchar external_event_id UK
+        varchar payload_hash
+        varchar payment_outcome "SUCCESS | FAILED"
+        varchar status "RECEIVED | PROCESSED | DUPLICATE | FAILED"
+        timestamp received_at
+        timestamp processed_at "Nullable"
+    }
+
+    %% ================= REFUNDS =================
+
+    REFUND_REQUESTS {
+        uuid refund_id PK
+        uuid payment_id FK "At most one PENDING or APPROVED refund request per payment"
+        uuid requested_by_user_id FK
+        uuid reviewed_by_support_id FK "Nullable"
+        decimal refund_amount
+        decimal reversed_commission
+        varchar status "PENDING | APPROVED | REJECTED"
+        text reason
+        text review_note "Nullable"
+        timestamp created_at
+        timestamp reviewed_at "Nullable"
+    }
+
+    %% ================= CONFIGURATION =================
+
+    SYSTEM_LIMIT_CONFIGS {
+        uuid config_id PK
+        varchar tier UK "BASIC | VERIFIED"
+        decimal min_payment_amount
+        decimal max_single_payment
+        decimal daily_payment_limit
+        int velocity_max_attempts
+        int velocity_window_seconds
+        int temp_block_duration_minutes
+        decimal agent_commission_rate
+        varchar daily_limit_timezone "Africa/Cairo"
+        timestamp updated_at
+    }
+
+    %% ================= NOTIFICATIONS =================
+
+    NOTIFICATION_TEMPLATES {
+        uuid template_id PK
+        varchar channel "SMS | EMAIL | PUSH"
+        varchar event_type
+        text message_template
+        boolean is_active
+    }
+
+    NOTIFICATIONS {
+        uuid notification_id PK
+        uuid user_id FK "Nullable (NULL for guest SMS)"
+        uuid payment_id FK
+        uuid template_id FK
+        varchar channel "SMS | EMAIL | PUSH"
+        varchar recipient
+        text message_body
+        varchar status "PENDING | SENT | FAILED | UNDELIVERED"
+        int attempt_count
+        timestamp created_at
+        timestamp last_attempt_at "Nullable"
+        timestamp next_retry_at "Nullable"
+        timestamp sent_at "Nullable"
+        text failure_reason "Nullable"
+    }
+
+    %% ================= RECONCILIATION =================
+
+    SETTLEMENT_FILES {
+        uuid file_id PK
+        uuid biller_id FK
+        varchar file_name UK
+        date settlement_date
+        int record_count
+        decimal total_amount
+        boolean is_complete
+        timestamp received_at
+    }
+
+    RECONCILIATION_REPORTS {
+        uuid report_id PK
+        uuid file_id FK, UK
+        date settlement_date
+        int file_record_count
+        decimal file_total_amount
+        int matched_count
+        int mismatched_count
+        int resolved_unknown_count
+        timestamp generated_at
+    }
+
+    RECONCILIATION_ITEMS {
+        uuid item_id PK
+        uuid report_id FK
+        uuid payment_id FK "Nullable for unmatched records"
+        varchar external_reference
+        decimal file_amount "Nullable when missing from file"
+        decimal system_amount "Nullable when no system record"
+        varchar status "MATCHED | MISMATCHED | PENDING_REVIEW | RESOLVED"
+        text difference_reason "Nullable"
+        timestamp resolved_at "Nullable"
+    }
+
+    %% ================= AUDIT =================
+
+    AUDIT_LOGS {
+        uuid audit_id PK
+        uuid actor_user_id FK "Nullable for system actions"
+        uuid ledger_entry_id FK, UK "Nullable for non-money actions"
+        varchar actor_type "USER | SYSTEM"
+        varchar action_type
+        varchar entity_type
+        uuid entity_id
+        decimal amount "Nullable"
+        jsonb old_value "Nullable"
+        jsonb new_value "Nullable"
+        text reason "Nullable"
+        timestamp created_at
+    }
+
+    %% ================= RELATIONSHIPS =================
+
+    %% Users and accounts
+    USERS o|--o| WALLETS : "owns (Customer/Agent: 1; Support/Admin: 0; PayLink wallet: user_id NULL)"
+    USERS o|--o{ PAYMENTS : customer
+    USERS ||--o{ PAYMENTS : initiates
+    USERS o|--o{ PAYMENTS : agent
+    USERS ||--o{ TOP_UP_TRANSACTIONS : initiates
+    USERS ||--o{ REFUND_REQUESTS : requests
+    USERS o|--o{ REFUND_REQUESTS : reviews
+    USERS o|--o{ NOTIFICATIONS : receives
+    USERS ||--o{ ACCOUNT_BLOCKS : has
+    USERS o|--o{ ACCOUNT_BLOCKS : creates
+    USERS o|--o{ ACCOUNT_BLOCKS : lifts
+    USERS o|--o{ AUDIT_LOGS : performs
+
+    %% Wallet and ledger
+    WALLETS ||--o{ LEDGER_ENTRIES : records
+    WALLETS ||--o{ PAYMENTS : funds
+    WALLETS ||--o{ TOP_UP_TRANSACTIONS : receives
+
+    %% Billers and services
+    BILLERS ||--|{ SERVICES : offers
+    BILLERS ||--o{ PAYMENTS : processes
+    BILLERS ||--o{ PROMOTIONS : offers
+    BILLERS ||--o{ SETTLEMENT_FILES : provides
+
+    SERVICES ||--o{ PAYMENTS : used_for
+    SERVICES ||--o{ FEE_RULES : uses
+    SERVICES o|--o{ PROMOTIONS : applies_to
+
+    %% Payments and lifecycle
+    PAYMENTS ||--o{ PAYMENT_STATE_HISTORY : tracks
+    PAYMENTS ||--o{ BILLER_INTERACTIONS : logs
+    PAYMENTS o|--o{ BILLER_CALLBACKS : receives
+    PAYMENTS ||--o{ REFUND_REQUESTS : has
+    PAYMENTS ||--o{ NOTIFICATIONS : triggers
+    PAYMENTS o|--o{ RECONCILIATION_ITEMS : checked_in
+
+    %% Ledger references
+    PAYMENTS o|--o{ LEDGER_ENTRIES : generates
+    TOP_UP_TRANSACTIONS o|--o{ LEDGER_ENTRIES : generates
+    REFUND_REQUESTS o|--o{ LEDGER_ENTRIES : generates
+
+    %% Notifications
+    NOTIFICATION_TEMPLATES ||--o{ NOTIFICATIONS : formats
+
+    %% Reconciliation
+    SETTLEMENT_FILES ||--o| RECONCILIATION_REPORTS : processed_into
+    RECONCILIATION_REPORTS ||--o{ RECONCILIATION_ITEMS : contains
+
+    %% Audit
+    LEDGER_ENTRIES o|--|| AUDIT_LOGS : audited_by

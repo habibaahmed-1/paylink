@@ -1,0 +1,31 @@
+---
+title: PayLink - Payment State Diagram
+---
+stateDiagram-v2
+    direction TB
+
+    [*] --> Initiated
+
+    Initiated --> FundsHeld: Validation passes and funds are held
+    Initiated --> Rejected: Validation fails
+
+    FundsHeld --> SentToBiller: Send payment to biller
+
+    SentToBiller --> Completed: Success confirmed
+    SentToBiller --> Failed: Failure confirmed
+    SentToBiller --> Unknown: No response within 10 seconds
+    SentToBiller --> Unknown: No final callback within 5 minutes after accepted
+
+    Unknown --> Completed: Success confirmed
+    Unknown --> Failed: Refusal confirmed or reconciliation proves non-receipt
+
+    Failed --> Refunded: Release held total to funding wallet
+
+    Completed --> [*]
+    Rejected --> [*]
+    Refunded --> [*]
+
+    note right of Unknown
+        Funds remain held.
+        Timeout alone does not trigger a refund.
+    end note
