@@ -1,6 +1,6 @@
 # PayLink Phase 1 Requirements and Design
 
-**Lab section:** S5,6
+**Lab section:** S5,6.
 
 | Name and student ID | Phase 1 contribution or lead responsibility |
 | :--- | :--- |
