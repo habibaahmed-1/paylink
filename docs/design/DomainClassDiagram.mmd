@@ -1,0 +1,446 @@
+classDiagram
+    direction TB
+
+    %% ================= ENUMS =================
+
+    class UserRole {
+        <<enumeration>>
+        CUSTOMER
+        AGENT
+        SUPPORT
+        ADMIN
+    }
+
+    class VerificationTier {
+        <<enumeration>>
+        BASIC
+        VERIFIED
+    }
+
+    class AccountStatus {
+        <<enumeration>>
+        ACTIVE
+        SUSPENDED
+    }
+
+    class AccountBlockType {
+        <<enumeration>>
+        MANUAL
+        VELOCITY
+    }
+
+    class WalletType {
+        <<enumeration>>
+        CUSTOMER
+        AGENT
+        PAYLINK
+    }
+
+    class PaymentState {
+        <<enumeration>>
+        INITIATED
+        FUNDS_HELD
+        SENT_TO_BILLER
+        COMPLETED
+        FAILED
+        UNKNOWN
+        REJECTED
+        REFUNDED
+    }
+
+    class LedgerEntryType {
+        <<enumeration>>
+        TOP_UP
+        HOLD
+        SETTLE
+        RELEASE
+        FEE_REVENUE
+        COMMISSION_DEBIT
+        COMMISSION_CREDIT
+        REFUND_CREDIT
+    }
+
+    class FeeType {
+        <<enumeration>>
+        FIXED
+        PERCENTAGE
+        TIERED
+    }
+
+    class DiscountType {
+        <<enumeration>>
+        FIXED
+        PERCENTAGE
+    }
+
+    class RefundRequestStatus {
+        <<enumeration>>
+        PENDING
+        APPROVED
+        REJECTED
+    }
+
+    class NotificationChannel {
+        <<enumeration>>
+        SMS
+        EMAIL
+        PUSH
+    }
+
+    class NotificationStatus {
+        <<enumeration>>
+        PENDING
+        SENT
+        FAILED
+        UNDELIVERED
+    }
+
+    class TopUpMethod {
+        <<enumeration>>
+        SIMULATED_CARD
+        AGENT_CASH
+    }
+
+    class IntegrationProtocol {
+        <<enumeration>>
+        REST_JSON
+        SOAP_XML
+        BATCH_CSV
+    }
+
+    class BillerResponseMode {
+        <<enumeration>>
+        IMMEDIATE
+        ASYNCHRONOUS
+        BATCH
+    }
+
+    class CallbackStatus {
+        <<enumeration>>
+        RECEIVED
+        PROCESSED
+        DUPLICATE
+        FAILED
+    }
+
+    class ReconciliationStatus {
+        <<enumeration>>
+        MATCHED
+        MISMATCHED
+        PENDING_REVIEW
+        RESOLVED
+    }
+
+    %% ================= USERS AND ACCOUNTS =================
+
+    class User {
+        UUID userId
+        String fullName
+        String phoneNumber
+        String email
+        String passwordHash
+        UserRole role
+        VerificationTier tier
+        AccountStatus status
+        DateTime createdAt
+    }
+
+    class AccountBlock {
+        UUID blockId
+        AccountBlockType blockType
+        String reason
+        DateTime startedAt
+        DateTime expiresAt
+        DateTime liftedAt
+    }
+
+    %% ================= WALLET AND LEDGER =================
+
+    class Wallet {
+        UUID walletId
+        WalletType walletType
+        String currency
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    class LedgerEntry {
+        UUID entryId
+        LedgerEntryType entryType
+        Decimal amount
+        Decimal availableBalanceChange
+        Decimal heldBalanceChange
+        String description
+        DateTime createdAt
+    }
+
+    class TopUpTransaction {
+        UUID topUpId
+        TopUpMethod method
+        Decimal amount
+        String externalReference
+        String status
+        DateTime createdAt
+    }
+
+    %% ================= BILLER CATALOG =================
+
+    class Biller {
+        UUID billerId
+        String code
+        String name
+        Boolean isActive
+        IntegrationProtocol protocol
+        BillerResponseMode responseMode
+        Boolean supportsAsyncCallback
+        int timeoutSeconds
+        int callbackDeadlineMinutes
+        JSON integrationConfig
+    }
+
+    class Service {
+        UUID serviceId
+        String name
+        String category
+        Boolean isActive
+        JSON requiredInputSchema
+        Decimal minAmount
+        Decimal maxAmount
+    }
+
+    %% ================= FEES AND PROMOTIONS =================
+
+    class FeeRule {
+        UUID feeRuleId
+        FeeType feeType
+        Decimal feeValue
+        Decimal minimumFee
+        Decimal lowerThreshold
+        Decimal upperThreshold
+        DateTime effectiveFrom
+        DateTime effectiveTo
+        Boolean isActive
+    }
+
+    class Promotion {
+        UUID promotionId
+        DiscountType discountType
+        Decimal discountValue
+        DateTime startDate
+        DateTime endDate
+        Boolean isActive
+    }
+
+    %% ================= PAYMENTS =================
+
+    class Payment {
+        UUID paymentId
+        String paymentReference
+        String idempotencyKey
+        String requestHash
+        String customerPhoneNumber
+        String billerAccountRef
+        Decimal billAmount
+        Decimal serviceFee
+        Decimal totalAmount
+        Decimal agentCommission
+        PaymentState state
+        String failureReason
+        int retryCount
+        DateTime nextRetryAt
+        DateTime callbackDeadline
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    class PaymentStateHistory {
+        UUID historyId
+        PaymentState previousState
+        PaymentState newState
+        String reason
+        DateTime changedAt
+    }
+
+    class BillerInteraction {
+        UUID interactionId
+        int attemptNumber
+        String requestReference
+        String responseCode
+        String responseMessage
+        String externalReference
+        DateTime sentAt
+        DateTime respondedAt
+        String outcome
+    }
+
+    class BillerCallback {
+        UUID callbackId
+        String paymentReference
+        String externalEventId
+        String payloadHash
+        CallbackStatus status
+        DateTime receivedAt
+        DateTime processedAt
+    }
+
+    %% ================= REFUNDS =================
+
+    class RefundRequest {
+        UUID refundId
+        Decimal refundAmount
+        Decimal reversedCommission
+        RefundRequestStatus status
+        String reason
+        String reviewNote
+        DateTime createdAt
+        DateTime reviewedAt
+    }
+
+    %% ================= CONFIGURATION =================
+
+    class SystemLimitConfig {
+        UUID configId
+        VerificationTier tier
+        Decimal minPaymentAmount
+        Decimal maxSinglePayment
+        Decimal dailyPaymentLimit
+        int velocityMaxAttempts
+        int velocityWindowSeconds
+        int tempBlockDurationMinutes
+        Decimal agentCommissionRate
+        String dailyLimitTimezone
+        DateTime updatedAt
+    }
+
+    %% ================= NOTIFICATIONS =================
+
+    class Notification {
+        UUID notificationId
+        NotificationChannel channel
+        String recipient
+        String messageBody
+        NotificationStatus status
+        int attemptCount
+        DateTime createdAt
+        DateTime lastAttemptAt
+        DateTime nextRetryAt
+        DateTime sentAt
+        String failureReason
+    }
+
+    class NotificationTemplate {
+        UUID templateId
+        NotificationChannel channel
+        String eventType
+        String messageTemplate
+        Boolean isActive
+    }
+
+    %% ================= RECONCILIATION =================
+
+    class SettlementFile {
+        UUID fileId
+        String fileName
+        Date settlementDate
+        int recordCount
+        Decimal totalAmount
+        Boolean isComplete
+        DateTime receivedAt
+    }
+
+    class ReconciliationReport {
+        UUID reportId
+        Date settlementDate
+        int fileRecordCount
+        Decimal fileTotalAmount
+        int matchedCount
+        int mismatchedCount
+        int resolvedUnknownCount
+        DateTime generatedAt
+    }
+
+    class ReconciliationItem {
+        UUID itemId
+        String externalReference
+        Decimal fileAmount
+        Decimal systemAmount
+        ReconciliationStatus status
+        String differenceReason
+        DateTime resolvedAt
+    }
+
+    %% ================= AUDIT =================
+
+    class AuditLog {
+        UUID auditId
+        String actorType
+        String actionType
+        String entityType
+        UUID entityId
+        Decimal amount
+        JSON oldValue
+        JSON newValue
+        String reason
+        DateTime createdAt
+    }
+
+    %% ================= USER RELATIONSHIPS =================
+
+    User "0..1" -- "0..1" Wallet : owns
+    User "0..1" -- "0..*" Payment : customer
+    User "1" -- "0..*" Payment : initiates
+    User "0..1" -- "0..*" Payment : agent
+    User "1" -- "0..*" RefundRequest : requests
+    User "0..1" -- "0..*" RefundRequest : reviews
+    User "0..1" -- "0..*" Notification : receives
+    User "0..1" -- "0..*" AuditLog : performs
+    User "1" -- "0..*" AccountBlock : has
+    User "0..1" -- "0..*" AccountBlock : creates
+    User "0..1" -- "0..*" AccountBlock : lifts
+    User "1" -- "0..*" TopUpTransaction : initiates
+
+    %% ================= WALLET RELATIONSHIPS =================
+
+    Wallet "1" -- "0..*" LedgerEntry : records
+    Wallet "1" -- "0..*" Payment : funds
+    Wallet "1" -- "0..*" TopUpTransaction : receives
+
+    Payment "0..1" -- "0..*" LedgerEntry : generates
+    TopUpTransaction "0..1" -- "0..*" LedgerEntry : generates
+    RefundRequest "0..1" -- "0..*" LedgerEntry : generates
+
+    %% ================= BILLER RELATIONSHIPS =================
+
+    Biller "1" -- "1..*" Service : offers
+    Service "1" -- "0..*" Payment : used for
+    Biller "1" -- "0..*" Payment : processes
+    Service "1" -- "0..*" FeeRule : uses
+    Biller "1" -- "0..*" Promotion : offers
+    Service "0..1" -- "0..*" Promotion : applies to
+
+    %% ================= PAYMENT RELATIONSHIPS =================
+
+    Payment "1" -- "0..*" PaymentStateHistory : tracks history
+    Payment "1" -- "0..*" BillerInteraction : logs attempts
+    Payment "0..1" -- "0..*" BillerCallback : receives
+    Payment "1" -- "0..*" RefundRequest : subject of
+    Payment "1" -- "0..*" Notification : triggers
+
+    %% ================= CONFIGURATION RELATIONSHIPS =================
+
+    SystemLimitConfig "1" ..> "0..*" Payment : enforces limits on
+
+    %% ================= NOTIFICATION RELATIONSHIPS =================
+
+    NotificationTemplate "1" -- "0..*" Notification : formats
+
+    %% ================= RECONCILIATION RELATIONSHIPS =================
+
+    Biller "1" -- "0..*" SettlementFile : provides
+    SettlementFile "1" -- "1" ReconciliationReport : processed into
+    ReconciliationReport "1" -- "0..*" ReconciliationItem : contains
+    Payment "0..1" -- "0..*" ReconciliationItem : checked against
+
+    %% ================= AUDIT RELATIONSHIPS =================
+
+    LedgerEntry "0..1" -- "1" AuditLog : audited by

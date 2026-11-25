@@ -1,0 +1,77 @@
+sequenceDiagram
+    autonumber
+
+    actor Payer as Customer or Agent
+    participant PayLink
+    participant Wallet as Wallet and Ledger
+    participant Biller
+    participant Notifications
+
+    Payer->>PayLink: Submit payment details and idempotency key
+    PayLink->>PayLink: Check idempotency key
+
+    alt Same key and matching details
+        PayLink-->>Payer: Return existing payment status
+    else Same key and different details
+        PayLink-->>Payer: Reject conflicting request
+    else New request
+        PayLink->>PayLink: Create payment as Initiated
+        PayLink->>PayLink: Calculate fee and total
+        PayLink->>PayLink: Validate details, account, limits and velocity
+
+        alt Validation fails
+            PayLink->>PayLink: Set Rejected
+            PayLink-->>Payer: Return rejection reason
+        else Validation passes
+            PayLink->>Wallet: Hold total from payer wallet
+
+            Note over Payer,Wallet: Agent payments use the Agent wallet.
+
+            alt Insufficient available funds
+                Wallet-->>PayLink: Hold refused
+                PayLink->>PayLink: Set Rejected
+                PayLink-->>Payer: Return insufficient funds
+            else Funds held
+                Wallet->>Wallet: Record hold in immutable ledger and audit
+                Wallet-->>PayLink: Hold confirmed
+                PayLink->>PayLink: Set FundsHeld
+                PayLink->>PayLink: Set SentToBiller
+                PayLink->>Biller: Send bill amount and unique reference
+
+                alt Success confirmed
+                    Biller-->>PayLink: Success
+
+                    critical Settle funds, credit commission and mark Completed atomically and exactly once
+                        PayLink->>Wallet: Charge held total and credit eligible Agent commission
+                        Wallet->>Wallet: Record movements in ledger and audit
+                        Wallet-->>PayLink: Settlement confirmed
+                        PayLink->>PayLink: Set Completed
+                    end
+
+                    Note over PayLink,Wallet: Agent commission equals 40 percent of the service fee.
+
+                    PayLink->>Notifications: Send Customer completion SMS and push
+                    PayLink-->>Payer: Return Completed
+
+                else Failure confirmed
+                    Biller-->>PayLink: Failure and reason
+                    PayLink->>PayLink: Set Failed
+                    PayLink->>Notifications: Send Customer failure SMS and push
+                    PayLink->>PayLink: Start refund flow
+                    PayLink-->>Payer: Return failure reason and current status
+
+                else TopUpNet returns accepted
+                    Biller-->>PayLink: Accepted
+                    PayLink-->>Payer: Return processing status
+                    Note over PayLink,Biller: Stay SentToBiller with funds held while awaiting final callback.
+
+                else No initial response within 10 seconds
+                    PayLink->>PayLink: Set Unknown
+                    PayLink-->>Payer: Return processing status
+                    Note over PayLink,Biller: Keep funds held and query the original payment reference.
+                end
+            end
+        end
+    end
+
+    Note over PayLink,Notifications: Notification failure does not reverse payment or change balances.
